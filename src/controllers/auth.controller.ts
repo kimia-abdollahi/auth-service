@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { User } from '../models/user.model';
+import { publishToQueue } from '../utils/rabbit';
 
 // Get Client Token
 export function getClientToken(req: Request, res: Response) {
@@ -58,5 +59,11 @@ export async function getUserToken(req: Request, res: Response) {
     { expiresIn: '1h' }
   );
 
+  await publishToQueue('user.login', {
+    userId: user._id,
+    username: user.username,
+    time: new Date().toISOString(),
+  });
+  
   return res.json({ token });
 }
