@@ -15,4 +15,6 @@ export const publishToQueue = async (queueName: string, data: any) => {
 
   await channel.assertQueue(queueName, { durable: false });
   channel.sendToQueue(queueName, Buffer.from(JSON.stringify(data)));
+
+  console.log(` Message sent to queue "${queueName}":`, data);
 };
