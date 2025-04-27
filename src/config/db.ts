@@ -5,9 +5,9 @@ export const connectDB = async () => {
     await mongoose.connect(process.env.MONGODB_URI!, {
       dbName: 'auth_service',
     });
-    console.log('✅ MongoDB connected');
+    console.log('MongoDB connected');
   } catch (error) {
-    console.error('❌ MongoDB connection failed:', error);
+    console.error('MongoDB connection failed:', error);
     process.exit(1);
   }
 };
