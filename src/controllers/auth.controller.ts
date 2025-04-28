@@ -119,3 +119,27 @@ export async function logoutUser(req: Request, res: Response) {
 
   return res.json({ message: 'Logged out successfully' });
 }
+
+// Update User Profile
+export async function updateProfile(req: Request, res: Response) {
+  const user = (req as any).user; // از توکن استخراج شده
+  const { username, password } = req.body;
+
+  const foundUser = await User.findById(user.userId);
+  if (!foundUser) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  if (username) {
+    foundUser.username = username;
+  }
+
+  if (password) {
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    foundUser.password = hashedPassword;
+  }
+
+  await foundUser.save();
+
+  return res.json({ message: 'Profile updated successfully' });
+}

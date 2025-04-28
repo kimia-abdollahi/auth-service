@@ -5,6 +5,7 @@ const {
   registerUser,
   refreshAccessToken,
   logoutUser,
+  updateProfile,
 } = require('../controllers/auth.controller');
 const { verifyToken } = require('../middlewares/auth.middleware');
 
@@ -17,7 +18,7 @@ router.post('/register', registerUser);
 router.post('/refresh-token', refreshAccessToken);
 router.post('/logout', logoutUser);
 
-// Protected route - needs valid token
+// Protected routes
 router.get('/profile', verifyToken, (req: Request, res: Response) => {
   const user = (req as any).user;
   res.json({
@@ -25,5 +26,7 @@ router.get('/profile', verifyToken, (req: Request, res: Response) => {
     user,
   });
 });
+
+router.put('/profile/update', verifyToken, updateProfile);
 
 module.exports = router;
