@@ -1,7 +1,9 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { User } from '../models/user.model';
+import { RefreshToken } from '../models/refreshToken.model';
 import { publishToQueue } from '../utils/rabbit';
 
 // Get Client Token
@@ -22,7 +24,7 @@ export function getClientToken(req: Request, res: Response) {
   return res.json({ token });
 }
 
-// user register
+// User Register
 export async function registerUser(req: Request, res: Response) {
   const { username, password } = req.body;
 
@@ -39,7 +41,7 @@ export async function registerUser(req: Request, res: Response) {
   return res.status(201).json({ message: 'User registered successfully' });
 }
 
-// Get User Token
+// Get User Token (Login)
 export async function getUserToken(req: Request, res: Response) {
   const { username, password } = req.body;
 
@@ -53,17 +55,67 @@ export async function getUserToken(req: Request, res: Response) {
     return res.status(401).json({ message: 'Invalid credentials' });
   }
 
-  const token = jwt.sign(
+  const accessToken = jwt.sign(
     { type: 'user', userId: user._id, username: user.username },
     process.env.JWT_SECRET!,
     { expiresIn: '1h' }
   );
+
+  const refreshToken = crypto.randomBytes(40).toString('hex');
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30); // Refresh token valid for 30 days
+
+  await RefreshToken.create({
+    userId: user._id,
+    token: refreshToken,
+    expiresAt,
+  });
 
   await publishToQueue('user.login', {
     userId: user._id,
     username: user.username,
     time: new Date().toISOString(),
   });
-  
-  return res.json({ token });
+
+  return res.json({
+    accessToken,
+    refreshToken,
+  });
+}
+
+// Refresh Access Token
+export async function refreshAccessToken(req: Request, res: Response) {
+  const { refreshToken } = req.body;
+
+  const storedToken = await RefreshToken.findOne({ token: refreshToken });
+
+  if (!storedToken || storedToken.expiresAt < new Date()) {
+    return res.status(401).json({ message: 'Invalid or expired refresh token' });
+  }
+
+  const user = await User.findById(storedToken.userId);
+  if (!user) {
+    return res.status(401).json({ message: 'User not found' });
+  }
+
+  const newAccessToken = jwt.sign(
+    { type: 'user', userId: user._id, username: user.username },
+    process.env.JWT_SECRET!,
+    { expiresIn: '1h' }
+  );
+
+  return res.json({ accessToken: newAccessToken });
+}
+
+// Logout User (Invalidate Refresh Token)
+export async function logoutUser(req: Request, res: Response) {
+  const { refreshToken } = req.body;
+
+  const deletedToken = await RefreshToken.findOneAndDelete({ token: refreshToken });
+
+  if (!deletedToken) {
+    return res.status(400).json({ message: 'Refresh token not found or already deleted' });
+  }
+
+  return res.json({ message: 'Logged out successfully' });
 }
