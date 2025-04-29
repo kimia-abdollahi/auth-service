@@ -6,8 +6,10 @@ const {
   refreshAccessToken,
   logoutUser,
   updateProfile,
+  setUserRole,
 } = require('../controllers/auth.controller');
 const { verifyToken } = require('../middlewares/auth.middleware');
+const { verifyAdmin } = require('../middlewares/role.middleware');
 
 const router = Router();
 
@@ -28,5 +30,12 @@ router.get('/profile', verifyToken, (req: Request, res: Response) => {
 });
 
 router.put('/profile/update', verifyToken, updateProfile);
+
+// Admin-only routes
+router.get('/admin-only', verifyToken, verifyAdmin, (req: Request, res: Response) => {
+  res.json({ message: 'Welcome Admin! You have access.' });
+});
+
+router.put('/set-role', verifyToken, verifyAdmin, setUserRole);
 
 module.exports = router;

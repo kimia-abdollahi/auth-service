@@ -26,7 +26,7 @@ export function getClientToken(req: Request, res: Response) {
 
 // User Register
 export async function registerUser(req: Request, res: Response) {
-  const { username, password } = req.body;
+  const { username, password, role } = req.body;
 
   const existingUser = await User.findOne({ username });
   if (existingUser) {
@@ -34,7 +34,11 @@ export async function registerUser(req: Request, res: Response) {
   }
 
   const hashedPassword = bcrypt.hashSync(password, 10);
-  const newUser = new User({ username, password: hashedPassword });
+  const newUser = new User({ 
+    username, 
+    password: hashedPassword,
+    role: role || 'user',
+  });
 
   await newUser.save();
 
@@ -56,14 +60,14 @@ export async function getUserToken(req: Request, res: Response) {
   }
 
   const accessToken = jwt.sign(
-    { type: 'user', userId: user._id, username: user.username },
+    { type: 'user', userId: user._id, username: user.username, role: user.role },
     process.env.JWT_SECRET!,
     { expiresIn: '1h' }
   );
 
   const refreshToken = crypto.randomBytes(40).toString('hex');
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 30); // Refresh token valid for 30 days
+  expiresAt.setDate(expiresAt.getDate() + 30);
 
   await RefreshToken.create({
     userId: user._id,
@@ -99,7 +103,7 @@ export async function refreshAccessToken(req: Request, res: Response) {
   }
 
   const newAccessToken = jwt.sign(
-    { type: 'user', userId: user._id, username: user.username },
+    { type: 'user', userId: user._id, username: user.username, role: user.role },
     process.env.JWT_SECRET!,
     { expiresIn: '1h' }
   );
@@ -107,7 +111,7 @@ export async function refreshAccessToken(req: Request, res: Response) {
   return res.json({ accessToken: newAccessToken });
 }
 
-// Logout User (Invalidate Refresh Token)
+// Logout User
 export async function logoutUser(req: Request, res: Response) {
   const { refreshToken } = req.body;
 
@@ -122,7 +126,7 @@ export async function logoutUser(req: Request, res: Response) {
 
 // Update User Profile
 export async function updateProfile(req: Request, res: Response) {
-  const user = (req as any).user; // از توکن استخراج شده
+  const user = (req as any).user;
   const { username, password } = req.body;
 
   const foundUser = await User.findById(user.userId);
@@ -142,4 +146,23 @@ export async function updateProfile(req: Request, res: Response) {
   await foundUser.save();
 
   return res.json({ message: 'Profile updated successfully' });
+}
+
+// Set User Role (Admin only)
+export async function setUserRole(req: Request, res: Response) {
+  const { userId, role } = req.body;
+
+  if (!['user', 'admin'].includes(role)) {
+    return res.status(400).json({ message: 'Invalid role' });
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  user.role = role;
+  await user.save();
+
+  return res.json({ message: `User role updated to ${role}` });
 }

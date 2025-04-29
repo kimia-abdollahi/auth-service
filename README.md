@@ -4,9 +4,11 @@
 
 ## Project Description
 This is the **Authentication Service** for a microservices-based marketplace backend. It provides APIs for:
-- App-level authentication (Client Token)
+- Client authentication (Client Token)
 - User registration and login (User Token)
 - Token-protected profile route
+- Refresh Token system for session management
+- Role Based Access Control (Admin / User)
 - RabbitMQ integration for publishing login events
 
 ---
@@ -15,13 +17,13 @@ This is the **Authentication Service** for a microservices-based marketplace bac
 - **Node.js + TypeScript**
 - **Express.js**
 - **MongoDB** (Mongoose)
-- **RabbitMQ** (with amqplib)
+- **RabbitMQ** (amqplib)
 - **JWT** (jsonwebtoken)
 - **Docker** (for RabbitMQ container)
 
 ---
 
-## 🔄 How to Run Locally
+## How to Run Locally
 
 ### 1. Install Dependencies
 ```bash
@@ -46,7 +48,7 @@ If you have Docker, run:
 ```bash
 docker run -d --hostname rabbit --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
 ```
-Access RabbitMQ panel: `http://localhost:15672` (guest/guest)
+Access RabbitMQ panel: [http://localhost:15672](http://localhost:15672)
 
 ### 5. Start the Service
 ```bash
@@ -55,7 +57,7 @@ npm run dev
 
 ---
 
-## 🔍 API Endpoints
+## API Endpoints
 
 ### 1. Get Client Token
 **POST** `/auth/client-token`
@@ -66,7 +68,6 @@ npm run dev
   "client_secret": "super-secret"
 }
 ```
-- **Response:** JWT token for client authentication.
 
 ### 2. Register New User
 **POST** `/auth/register`
@@ -74,12 +75,12 @@ npm run dev
 ```json
 {
   "username": "kimia",
-  "password": "123456"
+  "password": "123456",
+  "role": "admin" // (optional, only for development)
 }
 ```
-- **Response:** Success message if registration is successful.
 
-### 3. Get User Token
+### 3. User Login (Get Access Token + Refresh Token)
 **POST** `/auth/user-token`
 - **Body:**
 ```json
@@ -88,7 +89,7 @@ npm run dev
   "password": "123456"
 }
 ```
-- **Response:** JWT token for user authentication.
+- **Response:** Access token + Refresh token.
 - **Side effect:** Publishes a login event to RabbitMQ (`user.login` queue).
 
 ### 4. Access Protected Profile
@@ -97,14 +98,75 @@ npm run dev
 ```http
 Authorization: Bearer <user_token>
 ```
-- **Response:** Protected user data.
+
+### 5. Refresh Access Token
+**POST** `/auth/refresh-token`
+- **Body:**
+```json
+{
+  "refreshToken": "your_refresh_token"
+}
+```
+
+### 6. Logout User (Invalidate Refresh Token)
+**POST** `/auth/logout`
+- **Body:**
+```json
+{
+  "refreshToken": "your_refresh_token"
+}
+```
+
+### 7. Update User Profile
+**PUT** `/auth/profile/update`
+- **Headers:**
+```http
+Authorization: Bearer <user_token>
+```
+- **Body:**
+```json
+{
+  "username": "newUsername",
+  "password": "newPassword"
+}
+```
+
+### 8. Admin-only Route (example)
+**GET** `/auth/admin-only`
+- **Headers:**
+```http
+Authorization: Bearer <admin_token>
+```
+
+### 9. Set User Role (Admin only)
+**PUT** `/auth/set-role`
+- **Headers:**
+```http
+Authorization: Bearer <admin_token>
+```
+- **Body:**
+```json
+{
+  "userId": "target_user_id",
+  "role": "admin"
+}
+```
+
+---
+
+## Role Based Access Control (RBAC)
+
+| Role | Access |
+|:---|:---|
+| user | Limited to their own profile and login features |
+| admin | Can manage other users, change roles, access admin routes |
 
 ---
 
 ## Debugging Tips
 - If Postman cannot connect, ensure service is running on `localhost:3000`.
 - Check MongoDB and RabbitMQ are up and reachable.
-- Watch terminal for `Auth service is running on port 3000` message.
+- Watch terminal for `✅ MongoDB connected` and `✅ Connected to RabbitMQ` messages.
 
 ---
 
